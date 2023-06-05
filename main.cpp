@@ -18,24 +18,30 @@ using namespace std;
 // Size of Clipping Window
 
 float	radius = 5.0;
-int		width = 700;
+int		width = 1300; 
 int		height = 700;
 float	point_size = 3.0;
 int		n = 0;
 
 int		backLeft = 20;
+int		backRight = 1080;
 int		backBottom = 30;
-int		backRight = 480;
 int		backTop = 670;
 
-int		polygon_num = 36;		
-int		ball_num = 1;			  
-int		block_num = 30;			
+int		polygon_num = 36;
+int		ball_num = 1;
+int		block_num = 50000;
 
 int		collide = 0;
 int		ranking[5] = { 234, 197, 120, 88, 36 };
 int		score = 12;
 int		time_limit = 321;
+
+
+float	barX;
+float	barY;
+int		barW = 70;
+int		barH = 15;
 
 
 struct Point {
@@ -62,9 +68,9 @@ struct Check {
 struct Ball {
 	Point	center;
 	float	radius = 10.0;
-	float	mass;		
+	float	mass;
 	Color	color;
-	Vector	velocity;	
+	Vector	velocity;
 };
 
 struct Block {
@@ -76,21 +82,22 @@ struct Block {
 	//Check	count;		
 };
 
-Ball*	ball;
-Block*	block;
-Check*	check;
-Point*	polygon_vertex;
+struct Ball* ball;
+struct Block* block;
+struct Check* check;
+struct Point* polygon_vertex;
 
 float	delta_x, delta_y;
 float	fix_radius;
 
+int		ballColor[3][3] = { {0.0, 1.0, 1.0}, {1.0, 1.0, 0.0}, {1.0, 0.0, 1.0} };
 
 void init(void) {
 	float	delta;
 	float	distribution_delta;
 	float	x, y;
 	int		r, g, b;
-	int		a = 0, i = 0, k = 0;
+	int		a, i = 0, k = 0;
 
 	polygon_vertex = new Point[polygon_num];
 	delta = 2.0 * PI / polygon_num;
@@ -104,88 +111,109 @@ void init(void) {
 
 	for (int i = 0; i < ball_num; i++) {
 		//ball[i].radius = radius * (1.5 + sin((double)(i)));
-		ball[i].center.x = (backRight - backLeft) / 2.0;
-		ball[i].center.y = (backTop - backBottom) / 4.0;
-		ball[i].velocity.x = -0.0;
-		ball[i].velocity.y = -0.0;					// 시작하기 버튼 클릭시 -1.0으로 변경
-		ball[i].mass = 1.5 + sin((double)(i));
-		ball[i].color.r = (float)(1.0 - (i % 3) / 2);
-		ball[i].color.g = (float)(1.0 - (ball_num - i) / ball_num);
-		ball[i].color.b = (float)(1.0 * (i % 10) / 9);
+		ball[i].center.x = 230;
+		ball[i].center.y = 110;
+		ball[i].velocity.x = 0.5;
+		ball[i].velocity.y = 0.1;
+		ball[i].mass = 1;
+		ball[i].color.r = ballColor[i][0];
+		ball[i].color.g = ballColor[i][1];
+		ball[i].color.b = ballColor[i][2];
 	}
 
-
-	block = new Block[block_num];
-	for (int j = 1; j <= 3; j++) {
+	int n = 0;
+	float last = 0.0;
+	block = new Block[100];
+	for (int j = 1; j <= 2; j++) {
+		a = 20 + rand() % 30;
 		k = i;
-		while (true) {
-			y = backTop - block[0].height * 1.5 * j;
-			//x = j * 50;
-			x = (y - 750) / (-4) + 30.0 + (block[0].width + 10.0) * (i-k);
-			cout << y << " " << x << "\n";
-		
-			if (((y + 1250) / 4) < x + block[0].width) { cout << "충돌\n"; break; }
+		for (int i = 0; i < 20; i++) {
 
-			block[i].point.x = x;
-			block[i].point.y = y;
-			block[i].count = rand() % 4;
+			y = backTop - 30 * 1.5 * j;
+			//x = ((y - 746) * -0.3030) + a + last;
+			x = ((y - 746) * -0.3030) + a + ((50 + 10.0) * (i - k));
+			//last = a + 20;
+			//cout << y << " " << x << "\n";
+
+			if (((y + 2884) * 0.3031) < x + 50 + 5.0) { break; }
+
+			block[n].point.x = x;
+			block[n].point.y = y;
+
+			// Set Block Color
+			if (n % 11 == 6) { block[n].count = 0; }
+			else { block[n].count = rand() % 3 + 1; }
 			switch (block[i].count)
 			{
-				case 0:		block[i].color.r = 255.0;	block[i].color.g = 255.0;	break;
-				case 1:		block[i].color.r = 255.0;	break;
-				case 2:		block[i].color.g = 255.0;	break;
-				case 3:		block[i].color.b = 255.0;	break;
-				default:	break;
+			case 0:		block[i].color.r = 255.0;	block[i].color.g = 255.0;	block[i].color.b = 255.0;	break;
+			case 1:		block[i].color.r = 255.0;	break;
+			case 2:		block[i].color.g = 255.0;	break;
+			case 3:		block[i].color.b = 255.0;	break;
+			default:	break;
 			}
-			i++;
-		}	
+			n++;
+		}
 	}
+
+	block_num = n;
+
+	// bar X Y position
+	barX = 200;
+	barY = 100;
 }
 
 
 void Draw_Background() {
-	
-	//float r = 330.0;
-	//float delta_theta = 2 * PI / 7;
+	int size = 100;
 
-	//glBegin(GL_POLYGON);
-	//for (int i = 0; i < 7; i++) {
-	//	glVertex2f(350 + r * cos(delta_theta * i), 350 + r * sin(delta_theta * i));
-	//}
-	//glEnd();
-
+	// Game Background 
 	glColor3f(255.0, 255.0, 255.0);
 	glBegin(GL_POLYGON);
-		glVertex2f(20.0,  30.0);
-		glVertex2f(100.0, 350.0);
-		glVertex2f(400.0, 350.0);
-		glVertex2f(480.0, 30.0);
+	glVertex2f(backLeft, backBottom);
+	glVertex2f(backLeft + size, height / 2);
+	glVertex2f(backRight - size, height / 2);
+	glVertex2f(backRight, backBottom);
 	glEnd();
 	glBegin(GL_POLYGON);
-		glVertex2f(30.0,  670.0);
-		glVertex2f(100.0, 350.0);
-		glVertex2f(400.0, 350.0);
-		glVertex2f(480.0, 670.0);
+	glVertex2f(backBottom, backTop);
+	glVertex2f(backLeft + size, height / 2);
+	glVertex2f(backRight - size, height / 2);
+	glVertex2f(backRight, backTop);
 	glEnd();
 
+	// Game Background Line
 	glColor3f(0.0, 0.0, 0.0);
 	glBegin(GL_LINE_LOOP);
-		glVertex2f(20.0, 30.0);
-		glVertex2f(100.0, 350.0);	
-		glVertex2f(30.0, 670.0);
-		glVertex2f(480.0, 670.0);
-		glVertex2f(400.0, 350.0);
-		glVertex2f(480.0, 30.0);
+	glVertex2f(backLeft, backBottom);
+	glVertex2f(backLeft + size, height / 2);
+	glVertex2f(backBottom, backTop);
+	glVertex2f(backRight, backTop);
+	glVertex2f(backRight - size, height / 2);
+	glVertex2f(backRight, backBottom);
 	glEnd();
 
-	glColor3f(255.0, 255.0, 255.0);
+	// Score Background
+	//glColor3f(255.0, 255.0, 255.0);
+	//glBegin(GL_POLYGON);
+	//glVertex2f(scoreX, backBottom);
+	//glVertex2f(scoreX, backTop);
+	//glVertex2f(scoreX + scoreW, backTop);
+	//glVertex2f(scoreX + scoreW, backBottom);
+	//glEnd();
+}
+
+
+void Draw_Bar(int x, int y) {
+	glColor3f(0.5, 0.0, 1.0);
+
 	glBegin(GL_POLYGON);
-		glVertex2f(500.0, 20.0);
-		glVertex2f(500.0, 680.0);
-		glVertex2f(680.0, 680.0);
-		glVertex2f(680.0, 20.0);
+	glVertex3f(x, y, 0.0);
+	glVertex3f(x + 70, y, 0.0);
+	glVertex3f(x + 70, y - 15, 0.0);
+	glVertex3f(x, y - 15, 0.0);
 	glEnd();
 }
+
 
 void Draw_Ball(int indexBall) {
 	float	x, y, radius;
@@ -229,99 +257,30 @@ void MyReshape(int w, int h) {
 	gluOrtho2D(0, width, 0, height);
 }
 
-// =====================================
-// Function to check if a point is inside a heptagon
-//bool pointInsideHeptagon(Point p, Wall w) {
-//	// Check distance from center
-//	float d = sqrt(pow(p.x - w.center.x, 2) + pow(p.y - w.center.y, 2));
-//	if (d > w.radius) {
-//		return false;
-//	}
-//	// Check angle from center
-//	float theta = atan2(p.y - w.center.y, p.x - w.center.x);
-//	if (theta < 0) {
-//		theta += 2 * M_PI;
-//	}
-//	int index = round(theta / ANGLE);
-//	float delta = index * ANGLE - theta;
-//	if (delta > ANGLE / 2) {
-//		delta -= ANGLE;
-//	}
-//	if (fabs(delta) <= M_PI / NUM_SIDES) {
-//		return true;
-//	}
-//	return false;
-//}
-//
-//// Function to check if a ball collides with a heptagonal wall
-//bool ballCollidesWithHeptagon(Ball b, Wall w) {
-//	Point p = b.position;
-//	float r = b.radius;
-//	if (pointInsideHeptagon(p, w)) {
-//		return true;
-//	}
-//	Point v = b.velocity;
-//	float A = pow(v.x, 2) + pow(v.y, 2);
-//	float B = 2 * (p.x * v.x - w.center.x * v.x + p.y * v.y - w.center.y * v.y);
-//	float C = pow(p.x, 2) - 2 * p.x * w.center.x + pow(w.center.x, 2) + pow(p.y, 2) - 2 * p.y * w.center.y + pow(w.center.y, 2) - pow(r + w.radius, 2);
-//	float delta = pow(B, 2) - 4 * A * C;
-//	if (delta < 0) {
-//		return false;
-//	}
-//	float t1 = (-B + sqrt(delta)) / (2 * A);
-//	float t2 = (-B - sqrt(delta)) / (2 * A);
-//	if (t1 >= 0 || t2 >= 0) {
-//		return true;
-//	}
-//	return false;
-//}
 
-// ========================================
 void Check_Collision_Ball_Wall(Ball& ball) {
-	float normX = 0, normY = 0;
-	
 	if (ball.center.y <= 350.0) {
-		if (ball.center.y - ball.radius < 30.0 && ball.velocity.y < 0.0) {		// 아래 면
+		if (ball.center.y - ball.radius < 30.0 && ball.velocity.y < 0.0) {		// Bottom Face
 			ball.velocity.y *= -1;
 		}
-		else if ((4 * ball.center.x + 50) < ball.center.y && ball.velocity.x < 0.0) {	// 1 면
+		else if ((4 * ball.center.x + 50) < ball.center.y && ball.velocity.x < 0.0) {	// 1 Face
 			ball.velocity.x *= -1;
 		}
-		else if (((-4) * ball.center.x + ball.radius + 1950) < ball.center.y && ball.velocity.x > 0.0) {	// 2 면
+		else if (((-4) * ball.center.x + ball.radius + 1950) < ball.center.y && ball.velocity.x > 0.0) {	// 2 Face
 			ball.velocity.x *= -1;
 		}
 	}
 	else if (ball.center.y > 350.0) {
-		if (ball.center.y + ball.radius > 670.0 && ball.velocity.y > 0.0) {		// 위 면
+		if (ball.center.y + ball.radius > 670.0 && ball.velocity.y > 0.0) {		// Top Face
 			ball.velocity.y *= -1;
 		}
-		else if (((-4) * ball.center.x + 750) > ball.center.y && ball.velocity.x < 0.0) {	// 3 면
+		else if (((-4) * ball.center.x + 750) > ball.center.y && ball.velocity.x < 0.0) {	// 3 Face
 			ball.velocity.x *= -1;
 		}
-		else if ((4 * ball.center.x - 1250) > ball.center.y && ball.velocity.x > 0.0) {		// 4 면
+		else if ((4 * ball.center.x - 1250) > ball.center.y && ball.velocity.x > 0.0) {		// 4 Face
 			ball.velocity.x *= -1;
 		}
 	}
-	
-
-	//else if (ball.center.x + ball.radius > backRight && ball.velocity.x > 0.0) {
-	//	normX = 0;
-	//	normY = 0;
-	//}
-	//else if (ball.center.x - ball.radius < backLeft && ball.velocity.x < 0.0) {
-	//	normX = 0;
-	//	normY = 0;
-	//}
-	//else if (ball.center.y + ball.radius > backTop && ball.velocity.y > 0.0) {
-	//	normX = 0;
-	//	normY = 0;
-	//}
-	//else if (ball.center.y - ball.radius < backBottom && ball.velocity.y < 0.0) {
-	//	normX = 0;
-	//	normY = 0;
-	//}
-
-
 }
 
 
@@ -337,11 +296,10 @@ void SpecialKey(int key, int x, int y) {
 }
 
 
-// Detect collision between ball and block
 bool collides(const Ball& ball, const Block& block) {
 	// Check if ball is within block's bounds
 
-	/*if (block.point.x <= ball.center.x + ball.radius && ball.center.x + ball.radius < block.point.x + block.width
+	if (block.point.x <= ball.center.x + ball.radius && ball.center.x + ball.radius < block.point.x + block.width
 		&& block.point.y <= ball.center.y + ball.radius && ball.center.y + ball.radius < block.point.y + block.height
 		&& ball.velocity.x >= 0.0 && ball.velocity.y >= 0.0) {
 		cout << ball.center.x << " " << ball.center.y << "\n";
@@ -373,7 +331,7 @@ bool collides(const Ball& ball, const Block& block) {
 		cout << "4 (-, -)" << "\n";
 		return true;
 	}
-*/
+
 
 	return false;
 }
@@ -381,7 +339,7 @@ bool collides(const Ball& ball, const Block& block) {
 // Calculate angle of incidence and angle of reflection after collision with block
 void updateBallDirection(Ball& ball, Block& block) {
 	// Calculate the normal vector of the block's surface at the point of collision
-	
+
 	//float normX, normY;
 	//if (ball.center.x < block.point.x) {
 	//	normX = -1;
@@ -425,16 +383,7 @@ void drawBitmapText(char* str, float x, float y) {
 
 
 void Draw_Score(void) {
-	//glColor3d(0, 0, 0);
-	//glBegin(GL_POLYGON);
-	//glVertex2f(width + 3, 0);
-	//glVertex2f(width + gameWidth, 0);
-	//glVertex2f(width + gameWidth, height);
-	//glVertex2f(width, height);
-	//glEnd();
 
-
-	
 	char str_1[] = "1";
 	char str_2[] = "2";
 	char str_3[] = "3";
@@ -452,7 +401,7 @@ void Draw_Score(void) {
 		int str_r = ranking[i];
 		drawBitmapText(itoa(str_r, str_Rank, 10), 600, 610 - i * 30);
 	}
-	
+
 	char str_Score[] = "Score";
 	drawBitmapText(str_Score, 560, 400);
 	drawBitmapText(itoa(score, str_Score, 10), 580, 350);
@@ -479,7 +428,7 @@ void RenderScene(void) {
 	for (i = 0; i < ball_num; i++) {
 		Check_Collision_Ball_Wall(ball[i]);
 	}
-		
+
 
 	//for (i = 0; i < ball_num; i++) {
 	//	for (int j = i + 1; j < ball_num; j++) {
@@ -503,6 +452,8 @@ void RenderScene(void) {
 	Update_Position();
 
 	Draw_Background();
+
+	Draw_Bar(200, 100);
 
 	for (i = 0; i < ball_num; i++)
 		Draw_Ball(i);
