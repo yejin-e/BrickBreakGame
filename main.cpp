@@ -3,13 +3,14 @@
 #include <windows.h>
 #include <math.h>
 #include <gl/gl.h>
-//#include <gl/glu.h>
-#include <gl/glut.h> // (or others, depending on the system in use)
+#include <gl/glut.h>
 #include <iostream>
 #include <string>
 #include <sstream>
-#include <cmath>
-//#include <ctime>
+#include <math.h>
+#include <algorithm>
+
+
 
 using namespace std;
 
@@ -29,8 +30,8 @@ using namespace std;
 #define		scoreX		1100
 #define		scoreW		180
 
-#define		brickWidth	100
-#define		brickHeight	50
+#define		brickWidth	50
+#define		brickHeight	30
 
 #define		barW		200
 #define		barH		15
@@ -44,9 +45,9 @@ int		brick_num = 100;
 int		ball_num = 1;
 
 int		collide = 0;
-int		ranking[5] = { 234, 197, 120, 88, 36 };
+int		ranking[6] = { 0, 0, 0, 0, 0, 0 };
 int		score = 0;
-int		time_limit = 321;
+int		time_limit = 320;
 
 float	barX;
 float	barY;
@@ -54,12 +55,16 @@ float	barY;
 float	delta_x, delta_y;
 float	fix_radius;
 
-int		level = 6;				// 블럭 층 개수 (2, 4, 6)
+int		brickFloor = 3;			// 블럭 층 개수 (1 ~ 6)
+int		brickColor = 4;			// 블럭 색깔 다양성 (빨강 1 ~ 보라 7)
+bool	selectBrickFloor = false;
+bool	selectBrickColor = false;
 
 bool	introScreen = true;		// 게임 시작 화면
 bool	pauseScreen = false;	// 일시정지 화면
-int		setBallAngle = 90.0;		// 시작공 좌우 방향 지정
+int		setBallAngle = 90.0;	// 시작공 좌우 방향 지정
 bool	startBall = false;		// 시작공 작동 여부
+bool	endScreen = false;		// 게임 결과 화면
 
 int		ballColor[3][3] = { {0.0, 1.0, 1.0}, {1.0, 1.0, 0.0}, {1.0, 0.0, 1.0} };
 
@@ -89,8 +94,6 @@ struct Ball {
 
 struct Brick {
 	Point	point;
-	int		width = 50;
-	int		height = 30;
 	int		count = 0;
 };
 
@@ -132,7 +135,7 @@ void init(void) {
 	int n = 0;
 	float last = 0.0;
 	brick = new Brick[100];
-	for (int j = 1; j <= level; j++) {
+	for (int j = 1; j <= brickFloor; j++) {
 		a = 20 + rand() % 30;
 		k = i;
 		for (int i = 0; i < 20; i++) {
@@ -150,7 +153,7 @@ void init(void) {
 
 			// Set Brick Color
 			if (n % 11 == 6) { brick[n].count = 0; }
-			else { brick[n].count = rand() % 7 + 1; }
+			else { brick[n].count = rand() % brickColor + 1; }
 			n++;
 		}
 	}
@@ -230,15 +233,13 @@ void Draw_Ball(int indexBall) {
 }
 
 
-void Draw_Brick(int idx) {
+void Draw_Brick(Brick *brick, int idx) {
 	float	x, y;
 	float	r = 0.0, g = 0.0, b = 0.0;
-	int		width, height, count;
+	int		count;
 
 	x = brick[idx].point.x;
 	y = brick[idx].point.y;
-	width = brick[idx].width;
-	height = brick[idx].height;
 	count = brick[idx].count;
 
 	switch (count)
@@ -259,9 +260,9 @@ void Draw_Brick(int idx) {
 
 	glBegin(GL_POLYGON);
 	glVertex3f(x, y, 0.0);
-	glVertex3f(x + width, y, 0.0);
-	glVertex3f(x + width, y + height, 0.0);
-	glVertex3f(x, y + height, 0.0);
+	glVertex3f(x + brickWidth, y, 0.0);
+	glVertex3f(x + brickWidth, y + brickHeight, 0.0);
+	glVertex3f(x, y + brickHeight, 0.0);
 	glEnd();
 }
 
@@ -276,15 +277,20 @@ void MyReshape(int w, int h) {
 
 void Check_Collision_Ball_Wall(Ball& ball) {
 
+
 	float bx = ball.center.x;
 	float by = ball.center.y;
 	float br = ball.radius;
 
+	if (by < bgBottom) {
+		ball_num--;
+	}
+
 	if (by <= allHeight / 2) {
-		if (by - br < bgBottom && by < 0.0) {		// Bottom Face
-			ball.velocity.y *= -1;
-		}
-		else if ((3.2 * (bx - br) - 34) < by && ball.velocity.x < 0.0) {		// 3 Face
+		//if (by - br < bgBottom && by < 0.0) {		// Bottom Face
+		//	ball.velocity.y *= -1;
+		//}
+		if ((3.2 * (bx - br) - 34) < by && ball.velocity.x < 0.0) {		// 3 Face
 			ball.velocity.x *= -1;
 		}
 		else if ((-3.2 * (bx + br) + 3486) < by && ball.velocity.x > 0.0) {		// 4 Face
@@ -322,8 +328,8 @@ bool Check_Collision_Ball_Brick() {
 			Brick k = brick[j];
 			x = k.point.x;		// 점 좌하단 기준 
 			y = k.point.y;
-			h = brick[0].height;
-			w = brick[0].width;
+			h = brickHeight;
+			w = brickWidth;
 
 
 			// 없는 벽돌이라면
@@ -334,7 +340,7 @@ bool Check_Collision_Ball_Brick() {
 					//cout << "1";
 					ball[i].velocity.y *= -1;
 					brick[j].count--;
-					score++;
+					score += 10;
 					return true;
 				}
 
@@ -343,23 +349,16 @@ bool Check_Collision_Ball_Brick() {
 					ball[i].velocity.x *= -1;
 					ball[i].velocity.y *= -1;
 					brick[j].count--;
-					score++;
+					score += 10;
 					return true;
 				}
-				/*if (x == (bx - br) && y == (by + br) && vx < 0.0 && vy > 0.0) {
-					ball[i].velocity.x *= -1;
-					ball[i].velocity.y *= -1;
-					brick[j].count--;
-					score++;
-					return true;
-				}*/
 
 				// 벽돌 우단 면
-				if ((bx - br) <= (x + h) && y <= by && by <= (y + h) && vx < 0.0) {
+				if (x + h - 1 < (bx + br) && (bx + br) < x + h + 1 && y <= by && by <= (y + h) && vx < 0.0) {
 					//cout << "2";
 					ball[i].velocity.x *= -1;
 					brick[j].count--;
-					score++;
+					score += 10;
 					return true;
 				}
 
@@ -368,23 +367,16 @@ bool Check_Collision_Ball_Brick() {
 					ball[i].velocity.x *= -1;
 					ball[i].velocity.y *= -1;
 					brick[j].count--;
-					score++;
+					score += 10;
 					return true;
 				}
-				/*if (x == (bx - br) && y == (by - br) && vx < 0.0 && vy < 0.0) {
-					ball[i].velocity.x *= -1;
-					ball[i].velocity.y *= -1;
-					brick[j].count--;
-					score++;
-					return true;
-				}*/
 
 				// 벽돌 상단 면
 				if (x <= bx && bx <= (x + h) && y < (by - br) && (by - br) <= (y + h) && vy < 0.0) {
 					//cout << "3";
 					ball[i].velocity.y *= -1;
 					brick[j].count--;
-					score++;
+					score += 10;
 					return true;
 				}
 
@@ -393,23 +385,16 @@ bool Check_Collision_Ball_Brick() {
 					ball[i].velocity.x *= -1;
 					ball[i].velocity.y *= -1;
 					brick[j].count--;
-					score++;
+					score += 10;
 					return true;
 				}
-				/*if (x == (bx + br) && y == (by - br) && vx > 0.0 && vy < 0.0) {
-					ball[i].velocity.x *= -1;
-					ball[i].velocity.y *= -1;
-					brick[j].count--;
-					score++;
-					return true;
-				}*/
 
 				// 벽돌 좌단 면
-				if (x <= (bx + br) && y <= by && by <= (y + h) && vy > 0.0) {
+				if (x - 1 < (bx + br) && (bx + br) < x + 1 && y <= by && by <= (y + h) && vy > 0.0) {
 					//cout << "4";
 					ball[i].velocity.x *= -1;
 					brick[j].count--;
-					score++;
+					score += 10;
 					return true;
 				}
 
@@ -418,16 +403,9 @@ bool Check_Collision_Ball_Brick() {
 					ball[i].velocity.x *= -1;
 					ball[i].velocity.y *= -1;
 					brick[j].count--;
-					score++;
+					score += 10;
 					return true;
 				}
-				/*if (x == (bx + br) && y == (by + br) && vx > 0.0 && vy > 0.0) {
-					ball[i].velocity.x *= -1;
-					ball[i].velocity.y *= -1;
-					brick[j].count--;
-					score++;
-					return true;
-				}*/
 			}
 		}
 	}
@@ -455,57 +433,35 @@ void Update_Position(void) {
 }
 
 
-//void SpecialKey(int key, int x, int y) {
-//	switch (key) {
-//	case GLUT_KEY_LEFT:		
-//		barX -= 50;
-//		break;
-//	case GLUT_KEY_RIGHT:	
-//		barX += 50;
-//		break;
-//	//case GLUT_KEY_DOWN:		moving_sphere.y -= 0.1;
-//	//	break;
-//	//case GLUT_KEY_UP:		moving_sphere.y += 0.1;
-//	//	break;
-//	default: break;
-//	}
-//	if (barX < 42)				barX = 42;					// backgroundLeft : 20
-//	if (barX > 1058 - barW)		barX = 1058 - barW;			// backgroundRight: 1080		barWidth: 70
-//}
-
-
-
-
-
 bool collides(const Ball& ball, const Brick& block) {
 	// Check if ball is within brick's bounds
 
-	if (block.point.x <= ball.center.x + ball.radius && ball.center.x + ball.radius < block.point.x + block.width
-		&& block.point.y <= ball.center.y + ball.radius && ball.center.y + ball.radius < block.point.y + block.height
+	if (block.point.x <= ball.center.x + ball.radius && ball.center.x + ball.radius < block.point.x + brickWidth
+		&& block.point.y <= ball.center.y + ball.radius && ball.center.y + ball.radius < block.point.y + brickHeight
 		&& ball.velocity.x >= 0.0 && ball.velocity.y >= 0.0) {
 		cout << ball.center.x << " " << ball.center.y << "\n";
 		cout << block.point.x << " " << block.point.y << "\n";
 		cout << "1 (+, +)" << "\n";
 		return true;
 	}
-	if (block.point.x <= ball.center.x + ball.radius && ball.center.x + ball.radius < block.point.x + block.width
-		&& block.point.y < ball.center.y - ball.radius && ball.center.y - ball.radius <= block.point.y + block.height
+	if (block.point.x <= ball.center.x + ball.radius && ball.center.x + ball.radius < block.point.x + brickWidth
+		&& block.point.y < ball.center.y - ball.radius && ball.center.y - ball.radius <= block.point.y + brickHeight
 		&& ball.velocity.x >= 0.0 && ball.velocity.y < 0.0) {
 		cout << ball.center.x << " " << ball.center.y << "\n";
 		cout << block.point.x << " " << block.point.y << "\n";
 		cout << "2 (+, -)" << "\n";
 		return true;
 	}
-	if (block.point.x <= ball.center.x - ball.radius && ball.center.x - ball.radius < block.point.x + block.width
-		&& block.point.y < ball.center.y + ball.radius <= block.point.y + block.height
+	if (block.point.x <= ball.center.x - ball.radius && ball.center.x - ball.radius < block.point.x + brickWidth
+		&& block.point.y < ball.center.y + ball.radius <= block.point.y + brickHeight
 		&& ball.velocity.x < 0.0 && ball.velocity.y >= 0.0) {
 		cout << ball.center.x << " " << ball.center.y << "\n";
 		cout << block.point.x << " " << block.point.y << "\n";
 		cout << "3 (-, +)" << "\n";
 		return true;
 	}
-	if (block.point.x < ball.center.x - ball.radius && ball.center.x - ball.radius <= block.point.x + block.width
-		&& block.point.y < ball.center.y - ball.radius && ball.center.y - ball.radius <= block.point.y + block.height
+	if (block.point.x < ball.center.x - ball.radius && ball.center.x - ball.radius <= block.point.x + brickWidth
+		&& block.point.y < ball.center.y - ball.radius && ball.center.y - ball.radius <= block.point.y + brickHeight
 		&& ball.velocity.x < 0.0 && ball.velocity.y < 0.0) {
 		cout << ball.center.x << " " << ball.center.y << "\n";
 		cout << block.point.x << " " << block.point.y << "\n";
@@ -564,39 +520,94 @@ void drawBitmapText(char* str, float x, float y) {
 
 
 void Draw_Score(void) {
+	string str;
+	glColor3f(0.0, 0.0, 0.0);
 
-	char str_1[] = "1";
-	char str_2[] = "2";
-	char str_3[] = "3";
-	char str_4[] = "4";
-	char str_5[] = "5";
-
-	char str_Rank[] = "Rank";
-	drawBitmapText(str_Rank, scoreX + scoreW / 3, 600);
-
-	drawBitmapText(str_1, scoreX + scoreW / 4, 550);
-	drawBitmapText(str_2, scoreX + scoreW / 4, 520);
-	drawBitmapText(str_3, scoreX + scoreW / 4, 490);
-	drawBitmapText(str_4, scoreX + scoreW / 4, 460);
-	drawBitmapText(str_5, scoreX + scoreW / 4, 430);
-
-	for (int i = 0; i < 5; i++) {
-		int str_r = ranking[i];
-		drawBitmapText(itoa(str_r, str_Rank, 10), scoreX + scoreW / 2, 550 - i * 30);
+	string strRanking = "Rank";
+	string sequence = "12345";
+	glColor3f(0.0, 0.0, 1.0);
+	glRasterPos2f(scoreX + scoreW * 2 / 5.0, 630.0);
+	for (int i = 0; i < strRanking.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, strRanking[i]);
+	}
+	glColor3f(0.0, 0.0, 0.0);
+	for (int i = 0; i < sequence.size(); i++) {
+		glRasterPos2f(scoreX + scoreW / 4.0, 590 - i * 30.0);
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, sequence[i]);
+		
+		str = to_string(ranking[i]);
+		if (str.size() == 2)		str = "0" + str;
+		else if (str.size() < 2)	str = "00" + str;
+		glRasterPos2f(scoreX + scoreW / 2.0, 590 - i * 30.0);
+		for (int j = 0; j < str.size(); j++) {
+			glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, str[j]);
+		}
 	}
 
-	char str_Score[] = "Score";
-	drawBitmapText(str_Score, scoreX + scoreW * 2 / 5, 350);
-	drawBitmapText(itoa(score, str_Score, 10), scoreX + scoreW * 2 / 5, 300);
+	glColor3f(0.0, 0.0, 1.0);
+	string strScore = "Score";
+	glRasterPos2f(scoreX + scoreW * 2 / 5.0, 400.0);
+	for (int i = 0; i < strScore.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, strScore[i]);
+	}
+	glColor3f(0.0, 0.0, 0.0);
+	glRasterPos2f(scoreX + scoreW * 2 / 5.0, 360.0);
+	str = to_string(score);
+	if (str.size() == 2)		str = "0" + str;
+	else if (str.size() < 2)	str = "00" + str;
+	for (int i = 0; i < str.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, str[i]);
+	}
 
+	glColor3f(0.0, 0.0, 1.0);
+	string strTime = "Time:";
+	glRasterPos2f(scoreX + scoreW * 2 / 5.0, 290.0);
+	for (int i = 0; i < strTime.size() - 1; i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, strTime[i]);
+	}
+	glColor3f(0.0, 0.0, 0.0);
+	str = to_string(time_limit / 60);
+	if (str.size() == 1)	str = "0" + str;
+	glRasterPos2f(scoreX + scoreW / 3.0, 250.0);
+	for (int i = 0; i < str.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, str[i]);
+	}
+	glRasterPos2f(scoreX + scoreW / 2.0, 250.0);
+	glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, strTime[4]);
+	str = to_string(time_limit % 60);
+	if (str.size() == 1)	str = "0" + str;
+	glRasterPos2f(scoreX + scoreW * 3 / 5.0, 250.0);
+	for (int i = 0; i < str.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, str[i]);
+	}
 
-	char str_Time[] = "Time";
-	char colon[] = ":";
-	drawBitmapText(str_Time, scoreX + scoreW * 2 / 5, 200);
-	drawBitmapText(itoa(time_limit / 60, str_Time, 10), scoreX + scoreW / 3, 150);
-	drawBitmapText(colon, scoreX + scoreW / 2, 150);
-	drawBitmapText(itoa(time_limit % 60, str_Time, 10), scoreX + scoreW * 2 / 3, 150);
-
+	glColor3f(0.0, 0.0, 1.0);
+	string strHotKey = "HotKey";
+	glRasterPos2f(scoreX + scoreW / 3.0, 180.0);
+	for (int i = 0; i < strHotKey.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, strHotKey[i]);
+	}
+	glColor3f(0.0, 0.0, 0.0);
+	string strBall = "N <-  Ball  -> M";
+	glRasterPos2f(scoreX + scoreW / 7.0, 145.0);
+	for (int i = 0; i < strBall.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, strBall[i]);
+	}
+	string strBar = "A <-  Bar  -> D";
+	glRasterPos2f(scoreX + scoreW / 7.0, 115.0);
+	for (int i = 0; i < strBar.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, strBar[i]);
+	}
+	string strStart = "Start    =>    B";
+	glRasterPos2f(scoreX + scoreW / 6.0, 85.0);
+	for (int i = 0; i < strStart.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, strStart[i]);
+	}
+	string strPause = "Pause   =>    P";
+	glRasterPos2f(scoreX + scoreW / 6.0, 60.0);
+	for (int i = 0; i < strPause.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, strPause[i]);
+	}
 }
 
 
@@ -610,7 +621,7 @@ bool Brick_Count(void) {
 }
 
 
-void End_Screen(bool success) {
+void Draw_miniScreen(string strResult) {
 	int x = 450;
 	int y = 350;
 	int w = 300;
@@ -624,20 +635,49 @@ void End_Screen(bool success) {
 	glVertex3f(x, y + h, 0.0);
 	glEnd();
 
-	if (success) {
-		char str[] = "Success";
-		drawBitmapText(str, x + w / 3, y + h / 2);
+	glColor3f(0.0, 0.0, 0.0);
+	glBegin(GL_LINE_LOOP);
+	glVertex3f(x, y, 0.0);
+	glVertex3f(x + w, y, 0.0);
+	glVertex3f(x + w, y + h, 0.0);
+	glVertex3f(x, y + h, 0.0);
+	glEnd();
+
+
+	/*if (pauseScreen) {
+		strResult = "Pause";
+
+		glRasterPos2f(x + 120, y + h / 2);
+	}
+	else if (success) {
+		strResult = "Success";
+		glRasterPos2f(x + 120, y + h / 2);
 	}
 	else {
-		char str[] = "Fail";
-		drawBitmapText(str, x + w / 3, y + h / 2);
+		strResult = "Fail";
+		glRasterPos2f(x + 140, y + h / 2);
+	}*/
+	glColor3f(1.0, 0.0, 0.0);
+	glRasterPos2f(x + 120, y + h / 2);
+	for (int i = 0; i < strResult.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, strResult[i]);
 	}
 }
 
 
-// 시작 화면
+void Update_Ranking() {
+	endScreen = true;
+	startBall = false;
+	ranking[5] = score;
+	sort(ranking, ranking + 6);
+}
+
+
 void Intro_Screen(void) {
-	
+	string str;
+	Brick *introBrick = new Brick[7];
+
+
 	glColor3f(1.0, 1.0, 1.0);
 	glBegin(GL_POLYGON);
 	glVertex2f(0.0, 0.0);
@@ -646,46 +686,93 @@ void Intro_Screen(void) {
 	glVertex2f(0.0, allHeight);
 	glEnd();
 
-	char str1[] = "Break Bricks";
-	char str2[] = ">>> Press the f1 button to start the game <<<";
-	drawBitmapText(str1, 430, 450);
-	drawBitmapText(str2, 330, 150);
 
+	for (int i = 0; i < 7; i++) {
+		introBrick[i].point.x = 300 + i * 100;
+		introBrick[i].point.y = allHeight - 100;
+		introBrick[i].count = i + 1;
+		Draw_Brick(introBrick, i);
+	}
+	glColor3f(0.5, 0.5, 0.5);
+	string subtitle = "break the rainbow";
+	glRasterPos2f(allWidth * 2 / 5, allHeight * 8 / 10);
+	for (int i = 0; i < subtitle.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, subtitle[i]);
+	}
+	
 
+	glColor3f(0.0, 0.0, 0.0);
+	string title = "Break Bricks";
+	glRasterPos2f(allWidth * 2 / 5, allHeight * 7 / 10);
+	for (int i = 0; i < title.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, title[i]);
+	}
+
+	glColor3f(0.2, 0.2, 0.2);
+	string setting = "Setting";
+	glRasterPos2f(allWidth / 3, allHeight * 5 / 10);
+	for (int i = 0; i < setting.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, setting[i]);
+	}
+
+	if (selectBrickFloor)		glColor3f(0.2, 0.2, 0.2);
+	else						glColor3f(0.5, 0.5, 0.5);
+	string strBrickfloor = "Brick floors";
+	glRasterPos2f(allWidth / 3, allHeight * 4 / 10);
+	for (int i = 0; i < strBrickfloor.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, strBrickfloor[i]);
+	}
+
+	if (brickFloor == 1)		str = "       " + to_string(brickFloor) + "     ->";
+	else if (brickFloor == 6)	str = "<-     " + to_string(brickFloor) + "       ";
+	else						str = "<-     " + to_string(brickFloor) + "     ->";	
+	if (selectBrickFloor)		glColor3f(1.0, 0.0, 0.0);
+	else						glColor3f(0.5, 0.5, 0.5);
+	glRasterPos2f(allWidth / 2, allHeight * 4 / 10);
+	for (int i = 0; i < str.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, str[i]);
+	}
+	glColor3f(0.5, 0.5, 0.5);
+
+	string strBrickLevel = "Break count";
+	if (selectBrickColor)		glColor3f(0.2, 0.2, 0.2);
+	else						glColor3f(0.5, 0.5, 0.5);
+	glRasterPos2f(allWidth / 3, allHeight * 3 / 10);
+	for (int i = 0; i < strBrickLevel.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, strBrickLevel[i]);
+	}
+
+	if (brickColor == 1)		str = "       " + to_string(brickColor) + "     ->";
+	else if (brickColor == 7)	str = "<-     " + to_string(brickColor) + "       ";
+	else						str = "<-     " + to_string(brickColor) + "     ->";
+	if (selectBrickColor)		glColor3f(1.0, 0.0, 0.0);
+	else						glColor3f(0.5, 0.5, 0.5);
+	glRasterPos2f(allWidth / 2, allHeight * 3 / 10);
+	for (int i = 0; i < str.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, str[i]);
+	}
+	
+
+	glColor3f(1.0, 0.0, 0.0);
+	string strStart = "Press the F1 button to start the game.";
+	glRasterPos2f(allWidth / 3, allHeight / 10);
+	for (int i = 0; i < strStart.size(); i++) {
+		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, strStart[i]);
+	}
+	
+	glColor3f(0.5, 0.5, 0.5);
 }
-
-//double deg2rad(double degree) {	// 선배코드
-//	return degree * PI / 180;
-//}
-//
-//void draw_arrow() {		// 선배코드
-//	double deg = deg2rad(415);
-//	double deg2 = deg - arrow.getStartAngle();
-//	double correct_deg = deg2rad(-40);
-//	if (!arrow.is_on_game()) {
-//		arrow.drawArr(ball[0]);
-//	}
-//	else if (arrow.is_started()) {
-//		m_ball->adjVelo(gm.get_speed() * cos(deg2 - correct_deg), gm.get_speed() * sin(deg2 - correct_deg), false);
-//		arrow.mov_flag_down();
-//	}
-//
-//}
 
 
 void Ball_Direction(void) {
-	//float vx = setBallAngle;
-	//float vy = 1.0;
 	float x = ball[0].center.x;
 	float y = ball[0].center.y;
 
 	float vx = ball[0].velocity.x;
 	float vy = ball[0].velocity.y;
 	
-	int dW = 5;
-	int dH = 50;
-
-	float a = PI/2 - tan(vy / -vx);
+	float dW = 3.0;
+	float dH = 50.0;
 
 	glPushMatrix();
 
@@ -696,10 +783,17 @@ void Ball_Direction(void) {
 
 	glColor3f(1.0, 0.0, 0.0);
 	glBegin(GL_POLYGON);
+
 	glVertex3f(-dW, 0, 0.0);
-	glVertex3f(dW, 0, 0.0);
-	glVertex3f(dW, dH, 0.0);
 	glVertex3f(-dW, dH, 0.0);
+	glVertex3f(dW, dH, 0.0);
+	glVertex3f(dW, 0.0, 0.0);
+	glEnd();
+
+	glBegin(GL_POLYGON);
+	glVertex3f(-dW - 10, dH, 0.0);
+	glVertex3f(0.0, dH + 10, 0.0);
+	glVertex3f(dW + 10, dH, 0.0);
 	glEnd();
 
 	glPopMatrix();
@@ -707,42 +801,96 @@ void Ball_Direction(void) {
 
 void MyKey(unsigned char key, int x, int y) {
 
-	switch (key) {
-	case 'a':										// 막대바 움직이기
-		if (barX > 42)				barX -= 50;		break;		// backgroundLeft : 20
-	case 'd':	
-		if (barX < 1058 - barW)		barX += 50;		break;		// backgroundRight: 1080	barWidth: 70
-
-	case 'z':	introScreen = false;	break;		// 게임 화면으로 넘어가기
-
+	switch (key) {	
+		
 	case 'p':										// 일시정지 화면
-		if (pauseScreen)	pauseScreen = false;
-		else				pauseScreen = true;		break;
-
-		if (!startBall) {
-	case 'm':										// 시작공 좌우 방향 지정
-		if (setBallAngle > 30)	setBallAngle -= 1;	cout << setBallAngle << "\n";	break;
-		//if (setBallAngle > -1.5)	setBallAngle -= 1;	cout << setBallAngle << "\n";	break;
-	case 'n':
-		if (setBallAngle < 150)	setBallAngle += 1;	cout << setBallAngle << "\n";	break;
-		//if (setBallAngle < 1.5)	setBallAngle += 1;	cout << setBallAngle << "\n";	break;
-	case 'b':										// 공을 움직여 게임 시작하기
-		startBall = true;
-		//ball[0].velocity.y = 1.0;
-		//ball[0].velocity.x = setBallAngle;
-		//ball[0].velocity.x = cos(setBallAngle * PI / 180.0);
-		//ball[0].velocity.y = sin(setBallAngle * PI / 180.0);
-		ball[0].velocity.x = cos(setBallAngle * PI / 180.0);
-		ball[0].velocity.y = sin(setBallAngle * PI / 180.0) * 0.3;
-		cout << "b";
-		break;
+		cout << pauseScreen << "\n";
+		if (pauseScreen) {
+			pauseScreen = false;	break;
+		}
+		else {
+			pauseScreen = true;		break;
 		}
 
 
+	case 'a':										// 시작공이 움직인 이후부터, 막대바 움직이기
+		if (startBall && barX > 92) {
+			barX -= 50;		break;		// backgroundLeft : 20
+		}
+	case 'd':
+		if (startBall && barX < 1010 - barW) {
+			barX += 50;		break;		// backgroundRight: 1080	barWidth: 70
+		}
+
+
+	case 'm':										// 시작공 좌우 방향 지정
+		if (!startBall && !introScreen && setBallAngle > 30) {
+			setBallAngle -= 1;	cout << setBallAngle << "\n";	break;
+		}
+	case 'n':
+		if (!startBall && !introScreen && setBallAngle < 150) {
+			setBallAngle += 1;	cout << setBallAngle << "\n";	break;
+		}
+	case 'b':										// 공을 움직여 게임 시작하기
+		if (!startBall && !introScreen) {
+			startBall = true;
+			ball[0].velocity.x = cos(setBallAngle * PI / 180.0);
+			ball[0].velocity.y = sin(setBallAngle * PI / 180.0) * 0.3;
+			cout << "b";
+			break;
+		}
 	default:	break;
 	}	
 
 	glutPostRedisplay();
+}
+
+
+void SpecialKey(int key, int x, int y) {
+	switch (key) {
+	case GLUT_KEY_DOWN:
+		if (!selectBrickFloor) {
+			selectBrickFloor = true;
+		}
+		if (selectBrickFloor) {
+			selectBrickFloor = false;
+			selectBrickColor = true;
+		}
+		break;
+	case GLUT_KEY_UP:
+		if (selectBrickFloor) {
+			selectBrickFloor = false;
+		}
+		if (selectBrickColor) {
+			selectBrickColor = false;
+			selectBrickFloor = true;
+		}
+		break;
+	case GLUT_KEY_LEFT:
+		if (selectBrickFloor && brickFloor > 1)		brickFloor--;	// 1까지
+		if (selectBrickColor && brickColor > 1)		brickColor--;	// 1까지
+		break;
+	case GLUT_KEY_RIGHT:
+		if (selectBrickFloor && brickFloor < 6)		brickFloor++;	// 6까지
+		if (selectBrickColor && brickColor < 7)		brickColor++;	// 7까지
+		break;
+	case GLUT_KEY_F1:
+		introScreen = false;	init();		break;		// 게임 화면으로 넘어가기
+	default: break;
+	}
+
+	glutPostRedisplay();
+}
+
+void MyTimer(int Value) {
+
+	if (startBall && !pauseScreen) {
+		time_limit--;
+		score++;
+	}
+		
+	glutPostRedisplay();
+	glutTimerFunc(1000, MyTimer, time_limit);
 }
 
 
@@ -755,17 +903,11 @@ void RenderScene(void) {
 	if (introScreen) {
 		Intro_Screen();
 	}
-	else if (pauseScreen) {
-
-	}
 	else {
-
 		
-		
-
 		glColor3f(0.0, 0.0, 0.0);
 
-		if (startBall) {
+		if (startBall && !pauseScreen) {
 
 			for (i = 0; i < ball_num; i++) {
 				Check_Collision_Ball_Wall(ball[i]);
@@ -782,54 +924,33 @@ void RenderScene(void) {
 		}
 
 
-
-
-		//for (i = 0; i < ball_num; i++) {
-		//	for (int j = i + 1; j < ball_num; j++) {
-		//		if (i != j) {
-		//			//Check_Collision_Ball_Ball(i, j);
-		//		}			
-		//	}
-		//}
-
-		//for (i = 0; i < ball_num; i++) {
-		//	for (int j = 0; j < brick_num; j++) {
-		//		//Check_Collision_Ball_Block(i, j);
-		//		if (collides(ball[i], brick[j])) {
-		//			updateBallDirection(ball[i], brick[j]);
-		//		}
-		//	}
-		//}
-
-		// cout << "Ball Update" << "\n";
-
-
-
 		Draw_Background();
 		Draw_Score();
-
 
 		Draw_Bar();
 
 		for (i = 0; i < brick_num; i++)
-			Draw_Brick(i);
+			Draw_Brick(brick, i);
 
-		if (startBall == false) {
+		if (!startBall && !endScreen) {
 			Ball_Direction();
 		}
 
 		for (i = 0; i < ball_num; i++)
 			Draw_Ball(i);
 		
+		if (pauseScreen) {
+			Draw_miniScreen("Pause");
+		}
 		
-
-		
-
-
-		if (Brick_Count())
-			End_Screen(true);
-		else if (Brick_Count() == false && time_limit < 0)
-			End_Screen(false);
+		if (Brick_Count()) {
+			Update_Ranking();
+			Draw_miniScreen("Success");			
+		}
+		else if ((!Brick_Count() && time_limit < 1) || ball_num == 0) {
+			Update_Ranking();
+			Draw_miniScreen("Fail");			
+		}
 	}
 
 	glFlush();
@@ -843,12 +964,13 @@ void main(int argc, char** argv) {
 	glutInitWindowPosition(50, 50);
 	glutInitWindowSize(allWidth, allHeight);
 	glutCreateWindow("Project: Break Bricks");
-	init();
+	//init();
 	glutDisplayFunc(RenderScene);
 	glutReshapeFunc(MyReshape);
-	//glutSpecialFunc(SpecialKey);
+	glutSpecialFunc(SpecialKey);
 	glutKeyboardFunc(MyKey);
 	glutIdleFunc(RenderScene);
+	glutTimerFunc(1000, MyTimer, time_limit);		// 타이머 함수
 	glutMainLoop();
 }
 //*/
