@@ -33,7 +33,6 @@ using namespace std;
 #define		brickWidth	50
 #define		brickHeight	30
 
-#define		barW		200
 #define		barH		15
 
 
@@ -42,15 +41,16 @@ float	point_size = 3.0;
 int		n = 0;
 
 int		brick_num = 100;
-int		ball_num = 1;
+int		ball_num;
 
 int		collide = 0;
 int		ranking[6] = { 0, 0, 0, 0, 0, 0 };
-int		score = 0;
-int		time_limit = 320;
+int		score;
+int		time_limit;
 
 float	barX;
 float	barY;
+int		barW = 200;
 
 float	delta_x, delta_y;
 float	fix_radius;
@@ -59,6 +59,7 @@ int		brickFloor = 3;			// 블럭 층 개수 (1 ~ 6)
 int		brickColor = 4;			// 블럭 색깔 다양성 (빨강 1 ~ 보라 7)
 bool	selectBrickFloor = false;
 bool	selectBrickColor = false;
+bool	selectEasyBar = false;
 
 bool	introScreen = true;		// 게임 시작 화면
 bool	pauseScreen = false;	// 일시정지 화면
@@ -109,6 +110,20 @@ void init(void) {
 	float	x, y;
 	int		r, g, b;
 	int		a, i = 0, k = 0;
+
+
+	ball_num = 1;
+	time_limit = 320;
+	score = 0;
+
+	selectBrickFloor = false;
+	selectBrickColor = false;
+	selectEasyBar = false;
+	pauseScreen = false;	// 일시정지 화면
+	setBallAngle = 90.0;	// 시작공 좌우 방향 지정
+	startBall = false;		// 시작공 작동 여부
+	endScreen = false;		// 게임 결과 화면
+
 
 	polygon_vertex = new Point[polygon_num];
 	delta = 2.0 * PI / polygon_num;
@@ -286,7 +301,7 @@ void Check_Collision_Ball_Wall(Ball& ball) {
 		ball_num--;
 	}
 
-	if (by <= allHeight / 2) {
+	if (bgBottom < by && by <= allHeight / 2) {
 		//if (by - br < bgBottom && by < 0.0) {		// Bottom Face
 		//	ball.velocity.y *= -1;
 		//}
@@ -643,20 +658,6 @@ void Draw_miniScreen(string strResult) {
 	glVertex3f(x, y + h, 0.0);
 	glEnd();
 
-
-	/*if (pauseScreen) {
-		strResult = "Pause";
-
-		glRasterPos2f(x + 120, y + h / 2);
-	}
-	else if (success) {
-		strResult = "Success";
-		glRasterPos2f(x + 120, y + h / 2);
-	}
-	else {
-		strResult = "Fail";
-		glRasterPos2f(x + 140, y + h / 2);
-	}*/
 	glColor3f(1.0, 0.0, 0.0);
 	glRasterPos2f(x + 120, y + h / 2);
 	for (int i = 0; i < strResult.size(); i++) {
@@ -669,7 +670,12 @@ void Update_Ranking() {
 	endScreen = true;
 	startBall = false;
 	ranking[5] = score;
-	sort(ranking, ranking + 6);
+	score = 0;
+	sort(ranking, ranking + 6, greater<>());		// 내림차순 정렬
+
+	for (int i = 0; i < 6; i++) {
+		cout << i << "  " << ranking[i] << "\n";
+	}
 }
 
 
@@ -812,6 +818,20 @@ void MyKey(unsigned char key, int x, int y) {
 			pauseScreen = true;		break;
 		}
 
+	case 'r':
+		selectBrickFloor = false;
+		selectBrickColor = false;
+		selectEasyBar = false;
+
+		introScreen = true;		// 게임 시작 화면
+		pauseScreen = false;	// 일시정지 화면
+		setBallAngle = 90.0;	// 시작공 좌우 방향 지정
+		startBall = false;		// 시작공 작동 여부
+		endScreen = false;		// 게임 결과 화면
+
+		Intro_Screen();
+		break;
+
 
 	case 'a':										// 시작공이 움직인 이후부터, 막대바 움직이기
 		if (startBall && barX > 92) {
@@ -852,7 +872,7 @@ void SpecialKey(int key, int x, int y) {
 		if (!selectBrickFloor) {
 			selectBrickFloor = true;
 		}
-		if (selectBrickFloor) {
+		else if (selectBrickFloor) {
 			selectBrickFloor = false;
 			selectBrickColor = true;
 		}
@@ -861,21 +881,25 @@ void SpecialKey(int key, int x, int y) {
 		if (selectBrickFloor) {
 			selectBrickFloor = false;
 		}
-		if (selectBrickColor) {
+		else if (selectBrickColor) {
 			selectBrickColor = false;
 			selectBrickFloor = true;
 		}
 		break;
 	case GLUT_KEY_LEFT:
-		if (selectBrickFloor && brickFloor > 1)		brickFloor--;	// 1까지
-		if (selectBrickColor && brickColor > 1)		brickColor--;	// 1까지
+		if (selectBrickFloor && brickFloor > 1)				brickFloor--;	// 1까지
+		else if (selectBrickColor && brickColor > 1)		brickColor--;	// 1까지
 		break;
 	case GLUT_KEY_RIGHT:
-		if (selectBrickFloor && brickFloor < 6)		brickFloor++;	// 6까지
-		if (selectBrickColor && brickColor < 7)		brickColor++;	// 7까지
+		if (selectBrickFloor && brickFloor < 6)				brickFloor++;	// 6까지
+		else if (selectBrickColor && brickColor < 7)		brickColor++;	// 7까지
 		break;
 	case GLUT_KEY_F1:
-		introScreen = false;	init();		break;		// 게임 화면으로 넘어가기
+		if (introScreen) {
+			introScreen = false;	
+			
+			init();		break;		// 게임 화면으로 넘어가기
+		}	
 	default: break;
 	}
 
@@ -925,7 +949,7 @@ void RenderScene(void) {
 
 
 		Draw_Background();
-		Draw_Score();
+		
 
 		Draw_Bar();
 
@@ -951,6 +975,8 @@ void RenderScene(void) {
 			Update_Ranking();
 			Draw_miniScreen("Fail");			
 		}
+
+		Draw_Score();
 	}
 
 	glFlush();
